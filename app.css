@@ -1,17 +1,281 @@
-/* The Listening chip and tray use Agent Pills' shared Cursor tray classes
-   (bb-agent-pills__pill, __tray-*), so that plugin should be on; only what
-   it lacks is here. */
+/* The Listening chip and its tray (app.tsx). This is a minimal copy of the
+   pill and tray styles in bb-plugin-agent-pills/app.css (`__pill`,
+   `__chip-count`, `__panel`, `__tray-*`), restyled under this plugin's own
+   `bb-subs-` classes: the chip looks the same with that plugin off, and no
+   selector here can reach another plugin or the host's composer. */
+
+.bb-subs {
+  --bb-subs-pill-surface: color-mix(in oklab, var(--background) 60%, transparent);
+  --bb-subs-pill-surface-hover: var(--surface-selected, var(--state-hover));
+  --bb-subs-pill-outline: var(--border);
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.bb-subs__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-height: 44px;
+  overflow: hidden;
+}
+
+.bb-subs__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  min-width: 0;
+  max-width: 420px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--bb-subs-pill-outline);
+  border-radius: 999px;
+  background: var(--bb-subs-pill-surface);
+  color: var(--pill-foreground, var(--muted-foreground));
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.bb-subs__pill:hover,
+.bb-subs__pill[aria-expanded="true"] {
+  background: var(--bb-subs-pill-surface-hover);
+  color: var(--foreground);
+}
+
+.bb-subs__pill:focus-visible {
+  outline: 1px solid var(--ring, var(--accent));
+  outline-offset: 1px;
+}
+
+.bb-subs__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-subs__count {
+  color: var(--subtle-foreground, var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+/* BB's composer context row (section[aria-label="Thread context before
+   sending"]) is `overflow: hidden`. A tray opens above it, so lift that only
+   while this plugin's own tray is open: scoped by `:has` to a row that
+   contains this plugin's chip, so no other surface or plugin is restyled. */
+section[aria-label="Thread context before sending"]:has(.bb-subs [aria-expanded="true"]) {
+  overflow: visible;
+}
+
+.bb-subs__tray {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 32px));
+  min-width: 280px;
+  max-width: min(620px, calc(100vw - 32px));
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--popover, var(--surface-raised-solid, var(--background)));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+}
+
+.bb-subs__tray-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 2px 4px 2px 8px;
+}
+
+.bb-subs__tray-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bb-subs__tray-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.bb-subs__tray-icon:hover {
+  background: var(--state-hover);
+  color: var(--foreground);
+}
+
+.bb-subs__tray-icon svg,
+.bb-subs__tray-icon [data-icon-root] {
+  width: 14px;
+  height: 14px;
+}
+
+.bb-subs__tray-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.bb-subs__tray-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--foreground);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bb-subs__tray-row[aria-disabled="true"] {
+  cursor: default;
+}
+
+.bb-subs__tray-row:hover,
+.bb-subs__tray-row:focus-visible {
+  background: var(--state-hover);
+  outline: none;
+}
+
+.bb-subs__tray-leading {
+  display: inline-flex;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground);
+}
+
+.bb-subs__tray-leading svg,
+.bb-subs__tray-leading [data-icon-root] {
+  width: 14px;
+  height: 14px;
+}
+
+.bb-subs__tray-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bb-subs__tray-description {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bb-subs__tray-description[data-error] {
+  color: var(--destructive-text, oklch(0.65 0.2 25));
+}
+
+.bb-subs__tray-end {
+  display: inline-grid;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-items: end;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.bb-subs__tray-end > * {
+  grid-area: 1 / 1;
+}
+
+.bb-subs__tray-meta {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bb-subs__tray-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bb-subs__tray-row:hover .bb-subs__tray-actions,
+.bb-subs__tray-row:focus-within .bb-subs__tray-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bb-subs__tray-row:hover .bb-subs__tray-actions ~ .bb-subs__tray-meta,
+.bb-subs__tray-row:focus-within .bb-subs__tray-actions ~ .bb-subs__tray-meta {
+  opacity: 0;
+}
+
+.bb-subs__tray-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bb-subs__tray-more::before {
+  content: "";
+  flex: 0 0 14px;
+}
+
+.bb-subs__tray-more:hover {
+  background: var(--state-hover);
+  color: var(--foreground);
+}
 
 .bb-subs__connective {
   color: var(--muted-foreground);
 }
 
-.bb-agent-pills__tray-description[data-error] {
-  color: var(--destructive, oklch(0.65 0.2 25));
-}
-
 .bb-subs__error {
   margin: 4px 8px 6px;
-  color: var(--destructive, oklch(0.65 0.2 25));
+  color: var(--destructive-text, oklch(0.65 0.2 25));
   font-size: 12px;
 }

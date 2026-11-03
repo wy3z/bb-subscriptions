@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { defineRpcContract, type BbPluginApi } from '@get-bb/plugin-sdk';
 import { z } from 'zod';
-import { compose, describe, snapshotSchema, subscriptionSchema, type Snapshot } from './model';
-import { fetchBatch, githubRepositoryFromRemote, isBareNumber, platformSchema, provider, providers, providerSettings, ProviderError, type ProviderConfig } from './providers';
+import { compose, describe, platformSchema, snapshotSchema, subscriptionSchema, type Snapshot } from './model';
+import { fetchBatch, platforms, provider, providers, providerSettings, ProviderError, type ProviderConfig } from './providers';
 
 const scope = z.object({ threadId: z.string().min(1).max(200) });
 const mutation = scope.extend({ platform: platformSchema, ids: z.array(z.string().min(1).max(1000)).min(1).max(50) });
@@ -15,7 +15,9 @@ export const rpcContract = defineRpcContract({
 type Pending = { thread: string; baselines: string; flush_at: number; dirty: number; queued_id: string | null; queued_updated: number | null };
 type Row = { thread: string; platform: string; id: string; snapshot: string | null; error: string | null; checked: number | null; due: number; failures: number; generation: string };
 const MAX_PER_THREAD = 100;
-const platforms = providers.map(p => p.id).join('|');
+const platformsList = platforms.join('|');
+/** `?,?,…` for the registered platforms, so legacy rows are never selected. */
+const ACTIVE_PLATFORMS = platforms.map(() => '?').join(', ');
 const backoff = (failures: number) => Math.min(3600_000, 30_000 * 2 ** Math.min(failures, 7));
 
 export default function plugin(bb: BbPluginApi) {
@@ -28,9 +30,12 @@ export default function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, [`CREATE TABLE subscriptions (thread TEXT NOT NULL, platform TEXT NOT NULL, id TEXT NOT NULL, snapshot TEXT, error TEXT, checked INTEGER, due INTEGER NOT NULL DEFAULT 0, failures INTEGER NOT NULL DEFAULT 0, generation TEXT NOT NULL, PRIMARY KEY(thread, platform, id))`,
     `CREATE TABLE pending (thread TEXT PRIMARY KEY, baselines TEXT NOT NULL, flush_at INTEGER NOT NULL, dirty INTEGER NOT NULL DEFAULT 1, queued_id TEXT, queued_updated INTEGER)`]);
   const changed = (threadId: string) => bb.realtime.publish('subscriptions-changed', { threadId });
-  const rows = (threadId: string) => db.prepare('SELECT * FROM subscriptions WHERE thread = ? ORDER BY platform, id').all(threadId) as Row[];
+  // Only registered platforms are ours to show or check. Rows recorded for a
+  // platform this plugin no longer owns — GitHub pull requests, now the Pull
+  // Requests plugin's — stay in the table untouched for its one-time import.
+  const rows = (threadId: string) => db.prepare(`SELECT * FROM subscriptions WHERE thread = ? AND platform IN (${ACTIVE_PLATFORMS}) ORDER BY platform, id`).all(threadId, ...platforms) as Row[];
   const list = async ({ threadId }: z.infer<typeof scope>) => ({
-    subscriptions: rows(threadId).map(row => ({ platform: row.platform, id: row.id, snapshot: row.snapshot ? snapshotSchema.parse(JSON.parse(row.snapshot)) : null, error: row.error, checkedAt: row.checked })),
+    subscriptions: rows(threadId).map(row => ({ platform: platformSchema.parse(row.platform), id: row.id, snapshot: row.snapshot ? snapshotSchema.parse(JSON.parse(row.snapshot)) : null, error: row.error, checkedAt: row.checked })),
     intervalSeconds: (await settings.get()).intervalSeconds,
   });
 
@@ -42,12 +47,7 @@ export default function plugin(bb: BbPluginApi) {
 
   async function mutate(input: z.infer<typeof mutation>, add: boolean) {
     const config = await settings.get() as ProviderConfig;
-    // Bare PR numbers resolve against the thread's project remote unless a default repository is configured.
-    const needsRemote = input.platform === 'github' && !config.githubRepository && input.ids.some(isBareNumber);
-    const thread = add || needsRemote ? await bb.sdk.threads.get({ threadId: input.threadId }) : null;
-    const repository = (config.githubRepository as string) || (needsRemote && thread?.projectId
-      ? githubRepositoryFromRemote((await bb.sdk.projects.get({ projectId: thread.projectId })).gitRemoteUrl) : '');
-    const ids = [...new Set(input.ids.map(id => provider(input.platform).canonical(id, { config, repository })))];
+    const ids = [...new Set(input.ids.map(id => provider(input.platform).canonical(id, { config })))];
     return serial(async () => {
       db.transaction(() => {
         if (add) {
@@ -65,13 +65,14 @@ export default function plugin(bb: BbPluginApi) {
   bb.rpc.register(rpcContract, { list, subscribe: input => mutate(input, true), unsubscribe: input => mutate(input, false) });
 
   const usage = [
-    `bb subscriptions (subscribe|unsubscribe) (${platforms}) <id> [id…] [--thread <id>] [--json]`,
+    `bb subscriptions (subscribe|unsubscribe) (${platformsList}) <id> [id…] [--thread <id>] [--json]`,
     'bb subscriptions list [--thread <id>] [--json]',
     ...providers.map(p => `  ${p.id}: ${p.label}, e.g. ${p.example}`),
+    '  GitHub pull requests are followed with `bb pull-requests subscribe <url>` instead.',
   ].join('\n');
   bb.cli.register({ name: 'subscriptions', summary: `Subscribe this thread to ${providers.map(p => p.label).join(' and ')} updates`, commands: [
-    { name: 'subscribe', summary: 'Subscribe one or more IDs (alias: sub)', usage: `bb subscriptions subscribe <${platforms}> <id> [id…] [--thread <id>] [--json]` },
-    { name: 'unsubscribe', summary: 'Unsubscribe one or more IDs (alias: unsub)', usage: `bb subscriptions unsubscribe <${platforms}> <id> [id…] [--thread <id>] [--json]` },
+    { name: 'subscribe', summary: 'Subscribe one or more IDs (alias: sub)', usage: `bb subscriptions subscribe <${platformsList}> <id> [id…] [--thread <id>] [--json]` },
+    { name: 'unsubscribe', summary: 'Unsubscribe one or more IDs (alias: unsub)', usage: `bb subscriptions unsubscribe <${platformsList}> <id> [id…] [--thread <id>] [--json]` },
     { name: 'list', summary: 'List subscriptions for this thread', usage: 'bb subscriptions list [--thread <id>] [--json]' },
   ], async run(argv, ctx) {
     try {
@@ -98,7 +99,7 @@ export default function plugin(bb: BbPluginApi) {
 
   bb.agents.registerTool({
     name: 'thread_subscriptions',
-    description: `Subscribe/unsubscribe this thread to updates for ${providers.map(p => `${p.label}s (${p.id}, e.g. ${p.example})`).join(' or ')}, or list subscriptions. Accepts multiple IDs per platform.`,
+    description: `Subscribe/unsubscribe this thread to updates for ${providers.map(p => `${p.label}s (${p.id}, e.g. ${p.example})`).join(' or ')}, or list subscriptions. Accepts multiple IDs per platform. GitHub pull requests are not handled here: use the pull_request_subscriptions tool or \`bb pull-requests subscribe\`.`,
     parameters: z.object({ action: z.enum(['subscribe', 'unsubscribe', 'list']), platform: platformSchema.optional(), ids: z.array(z.string()).max(50).optional() }),
     async execute(input, ctx) {
       if (input.action === 'list') return JSON.stringify(await list({ threadId: ctx.threadId }));
@@ -122,7 +123,9 @@ export default function plugin(bb: BbPluginApi) {
     const interval = (config.intervalSeconds as number) * 1000;
     const debounce = (config.debounceSeconds as number) * 1000;
     const now = Date.now();
-    const due = db.prepare('SELECT * FROM subscriptions WHERE due <= ? ORDER BY due LIMIT 100').all(now) as Row[];
+    // Legacy rows for platforms this plugin no longer owns are left alone:
+    // nothing here schedules them, so they are never fetched or retried.
+    const due = db.prepare(`SELECT * FROM subscriptions WHERE due <= ? AND platform IN (${ACTIVE_PLATFORMS}) ORDER BY due LIMIT 100`).all(now, ...platforms) as Row[];
     if (!due.length) return;
     // Look each thread up once per sweep; archived threads are skipped until the next interval.
     const threads = new Map<string, Promise<{ archived: boolean }>>();
@@ -180,6 +183,9 @@ export default function plugin(bb: BbPluginApi) {
         const lines: string[] = [];
         for (const [key, before] of Object.entries(baselines)) {
           const [platform, id] = key.split(/:(.*)/s);
+          // A baseline left over from a platform that moved to another plugin
+          // is not this plugin's message to send.
+          if (!platforms.includes(platform)) continue;
           const row = db.prepare('SELECT snapshot FROM subscriptions WHERE thread=? AND platform=? AND id=?').get(current.thread, platform, id) as Pick<Row, 'snapshot'> | undefined;
           const line = row?.snapshot ? describe(id, before, snapshotSchema.parse(JSON.parse(row.snapshot))) : null;
           if (line) lines.push(line);

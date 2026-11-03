@@ -9,11 +9,10 @@ import {
   useRpc,
 } from '@get-bb/plugin-sdk/app';
 import type { rpcContract } from './server';
-import type { Subscription } from './model';
+import type { Platform, Subscription } from './model';
 
 function subscriptionUrl(item: Subscription): string | undefined {
-  const url = item.snapshot?.url ?? (item.platform === 'github'
-    ? `https://github.com/${item.id.replace('#', '/pull/')}` : undefined);
+  const url = item.snapshot?.url;
   return url && /^https?:\/\//i.test(url) ? url : undefined;
 }
 
@@ -48,15 +47,10 @@ const NEXT_PAGE = 8;
 
 /**
  * Cursor's row sentence (subscription-row-display.js): an action, a
- * connective and an object, such as "PR activity on #42".
+ * connective and an object, such as "Issue activity on ENG-123".
  */
 function sentence(item: Subscription): { action: string; connective: string; object: string } {
-  if (item.platform === 'github') {
-    const hash = item.id.lastIndexOf('#');
-    return { action: 'PR activity', connective: 'on', object: hash >= 0 ? item.id.slice(hash) : item.id };
-  }
-  if (item.platform === 'linear') return { action: 'Issue activity', connective: 'on', object: item.id };
-  return { action: 'Activity', connective: 'on', object: item.id };
+  return { action: 'Issue activity', connective: 'on', object: item.id };
 }
 
 function LinearMark() {
@@ -65,17 +59,16 @@ function LinearMark() {
   </svg>;
 }
 
-function SourceIcon({ platform }: { platform: string }) {
-  if (platform === 'github') return <Icon name="Github" />;
-  if (platform === 'linear') return <LinearMark />;
-  return <Icon name="BellDot" />;
+/** The source mark: this plugin follows Linear issues only. */
+function SourceIcon({ platform }: { platform: Platform }) {
+  return platform === 'linear' ? <LinearMark /> : <Icon name="BellDot" />;
 }
 
 /**
  * A "Listening 2" chip in the row above the composer, after Cursor's
  * subscriptions pill, opening its tray: "N Subscriptions", then a row per
- * item with the source logo, "PR activity on #42", the item's state, and when
- * it was last checked, which hover swaps for a remove button.
+ * item with the source logo, "Issue activity on ENG-123", the item's state,
+ * and when it was last checked, which hover swaps for a remove button.
  */
 function ListeningPill({ threadId }: { threadId: string }) {
   const { items, refresh, rpc } = useSubscriptions(threadId);
@@ -120,11 +113,11 @@ function ListeningPill({ threadId }: { threadId: string }) {
   if (!items.length) return null;
   const count = items.length;
   const hidden = Math.max(0, count - shown);
-  return <div className="bb-agent-pills bb-subs" data-bb-agent-pills="" ref={root}>
-    <div className="bb-agent-pills__row">
+  return <div className="bb-subs" data-bb-plugin-root="" ref={root}>
+    <div className="bb-subs__row">
       <button
         type="button"
-        className="bb-agent-pills__pill"
+        className="bb-subs__pill"
         data-group="listening"
         aria-expanded={open}
         aria-haspopup="menu"
@@ -132,18 +125,18 @@ function ListeningPill({ threadId }: { threadId: string }) {
         title={`View subscriptions (${count})`}
         onClick={() => setOpen(value => !value)}
       >
-        <span className="bb-agent-pills__label">Listening</span>
-        <span className="bb-agent-pills__chip-count">{count}</span>
+        <span className="bb-subs__label">Listening</span>
+        <span className="bb-subs__count">{count}</span>
       </button>
     </div>
-    {open && <div className="bb-agent-pills__panel bb-agent-pills__tray" role="menu" aria-label="Subscriptions">
-      <div className="bb-agent-pills__tray-header">
-        <span className="bb-agent-pills__tray-title">{count} {count === 1 ? 'Subscription' : 'Subscriptions'}</span>
-        <button type="button" className="bb-agent-pills__tray-icon-button" aria-label="Minimize" title="Minimize (Esc)" onClick={() => setOpen(false)}>
+    {open && <div className="bb-subs__tray" role="menu" aria-label="Subscriptions">
+      <div className="bb-subs__tray-header">
+        <span className="bb-subs__tray-title">{count} {count === 1 ? 'Subscription' : 'Subscriptions'}</span>
+        <button type="button" className="bb-subs__tray-icon" aria-label="Minimize" title="Minimize (Esc)" onClick={() => setOpen(false)}>
           <Icon name="Minus" />
         </button>
       </div>
-      <div className="bb-agent-pills__tray-rows">
+      <div className="bb-subs__tray-rows">
         {items.slice(0, shown).map(item => {
           const url = subscriptionUrl(item);
           const words = sentence(item);
@@ -155,7 +148,7 @@ function ListeningPill({ threadId }: { threadId: string }) {
             tabIndex={0}
             aria-label={label}
             aria-disabled={url ? undefined : true}
-            className="bb-agent-pills__tray-row bb-subs__row"
+            className="bb-subs__tray-row"
             title={item.snapshot?.title ? `${item.snapshot.title} (${item.id})` : item.id}
             onClick={() => { if (url) window.open(url, '_blank', 'noopener,noreferrer'); }}
             onKeyDown={event => {
@@ -165,17 +158,17 @@ function ListeningPill({ threadId }: { threadId: string }) {
               }
             }}
           >
-            <span className="bb-agent-pills__tray-leading" aria-hidden="true"><SourceIcon platform={item.platform} /></span>
-            <span className="bb-agent-pills__tray-label">
+            <span className="bb-subs__tray-leading" aria-hidden="true"><SourceIcon platform={item.platform} /></span>
+            <span className="bb-subs__tray-label">
               {words.action} <span className="bb-subs__connective">{words.connective}</span> {words.object}
             </span>
-            <span className="bb-agent-pills__tray-description" data-error={item.error ? '' : undefined}>{state}</span>
-            <span className="bb-agent-pills__tray-end">
-              <span className="bb-agent-pills__tray-actions">
+            <span className="bb-subs__tray-description" data-error={item.error ? '' : undefined}>{state}</span>
+            <span className="bb-subs__tray-end">
+              <span className="bb-subs__tray-actions">
                 <button
                   type="button"
                   disabled={busy}
-                  className="bb-agent-pills__tray-icon-button"
+                  className="bb-subs__tray-icon"
                   aria-label={`Remove subscription ${label}`}
                   title="Remove Subscription"
                   onClick={event => { event.stopPropagation(); void unsubscribe(item); }}
@@ -183,13 +176,13 @@ function ListeningPill({ threadId }: { threadId: string }) {
                   <Icon name="Trash2" />
                 </button>
               </span>
-              <span className="bb-agent-pills__tray-meta">{item.checkedAt ? ago(now, item.checkedAt) : ''}</span>
+              <span className="bb-subs__tray-meta">{item.checkedAt ? ago(now, item.checkedAt) : ''}</span>
             </span>
           </div>;
         })}
         {hidden > 0 && <button
           type="button"
-          className="bb-agent-pills__tray-more"
+          className="bb-subs__tray-more"
           aria-label={`Show ${Math.min(hidden, NEXT_PAGE)} more ${Math.min(hidden, NEXT_PAGE) === 1 ? 'subscription' : 'subscriptions'}`}
           onClick={() => setShown(value => value + NEXT_PAGE)}
         >More</button>}
@@ -202,9 +195,9 @@ function ListeningPill({ threadId }: { threadId: string }) {
 export default definePluginApp(app => {
   app.slots.experimental_threadContextSegment({
     id: 'listening',
-    title: 'Subscriptions',
+    // Linear only: GitHub pull requests are the Pull Requests plugin's chip.
+    title: 'Linear subscriptions',
     group: experimental_THREAD_CONTEXT_SEGMENT_GROUPS.thread,
-    // After Agent Pills' activity pills (order 20).
     order: 30,
     summary: ListeningPill,
     useVisible: ({ threadId }) => useSubscriptions(threadId).items.length > 0,

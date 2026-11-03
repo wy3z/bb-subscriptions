@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { platformSchema } from './providers';
 export { platformSchema, type Platform } from './providers';
 export const snapshotSchema = z.object({
   title: z.string().max(1000), url: z.string().url(), state: z.string().max(200),
@@ -6,7 +7,7 @@ export const snapshotSchema = z.object({
 });
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export const subscriptionSchema = z.object({
-  platform: z.string(), id: z.string(), snapshot: snapshotSchema.nullable(),
+  platform: platformSchema, id: z.string(), snapshot: snapshotSchema.nullable(),
   error: z.string().nullable(), checkedAt: z.number().nullable(),
 });
 export type Subscription = z.infer<typeof subscriptionSchema>;

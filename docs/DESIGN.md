@@ -2,6 +2,12 @@
 
 Written 2026-09-14 against bb 0.43.0 / SDK 0.4.47 (host SDK is 0.4.84).
 
+> **Update 2026-11-03:** GitHub pull requests moved to the Pull Requests
+> plugin, which is now the only GitHub watcher. This plugin keeps the Linear
+> provider; the GitHub notes below are kept as the record of why the provider
+> registry looks the way it does, and of the migration the Pull Requests
+> plugin performs from this plugin's database.
+
 ## 1. Icon
 
 `bb.branding.icon` accepts either a **named host glyph** or a plugin-relative

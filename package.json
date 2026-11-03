@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-subscriptions",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "engines": {
     "bb": ">=0.48.1",
@@ -8,7 +8,7 @@
   },
   "bb": {
     "name": "Subscriptions",
-    "description": "Follow GitHub PRs and Linear issues with per-thread subscriptions and concise update messages, shown as a Listening pill above the composer. Linear needs only a read-only API key.",
+    "description": "Follow Linear issues with per-thread subscriptions and concise update messages, shown as a Listening pill above the composer. Needs only a read-only Linear API key. GitHub pull requests are followed by the Pull Requests plugin.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
