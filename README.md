@@ -1,5 +1,9 @@
 # Subscriptions for bb
 
+> Fork of [grrowl/bb-subscriptions](https://github.com/grrowl/bb-subscriptions)
+> that shows subscriptions as a **Listening** pill above the composer instead
+> of a count in the thread heading.
+
 A small bb plugin that follows GitHub PRs and Linear issues for a thread. GitHub is read through your existing authenticated `gh` CLI; Linear is read directly from its API with a **read-only** personal key. It stores the last observed state and sends a short thread message when something changes. An idle thread wakes; a busy thread gets a queued message.
 
 ```sh
@@ -12,7 +16,7 @@ bb subscriptions list --json
 
 `sub` / `unsub` are aliases. IDs can be separated by spaces or commas; PR and Linear issue URLs also work. Bulk commands accept up to 50 IDs for one platform and are validated before any subscription changes. Subscriptions are per thread, idempotent, and capped at 100 per thread. Outside a thread, pass `--thread <thread-id>`.
 
-Agents can use the `thread_subscriptions` tool, with `action`, `platform`, and `ids`. This makes requests such as “subscribe linear ENG-123 ENG-124” work through the agent. The generated bb command help also exposes the CLI. The plugin adds no management panel: just a small “N following” count in the thread heading, with current states or errors on hover. The count is hidden when empty.
+Agents can use the `thread_subscriptions` tool, with `action`, `platform`, and `ids`. This makes requests such as “subscribe linear ENG-123 ENG-124” work through the agent. The generated bb command help also exposes the CLI. The plugin adds no management panel: just a **Listening** chip in the row above the composer with the count, after Cursor's subscriptions pill. It opens a tray headed "N Subscriptions" with one row per item: the source logo, a sentence such as "PR activity on #42", the item's current state or error, and when it was last checked. Hovering swaps the time for a remove button; clicking a row opens the PR or issue. The chip is hidden when the thread has no subscriptions. It uses [Agent Pills](https://github.com/wy3z/bb-plugin-agent-pills)' shared pill and tray classes, so that plugin should be on.
 
 ## Why a plugin?
 
@@ -22,7 +26,7 @@ A bb scheduled script plus `bb thread tell` is a valid alternative for a few fix
 
 ## Install
 
-Requires bb >=0.42, SDK >=0.4.47, and an authenticated `gh` on the **bb server's PATH** (a CLI on a different enrolled machine is not used). Linear needs no CLI: create a personal API key and set it as a plugin secret.
+Requires bb >=0.48.1 (for the context-row slot the pill uses), SDK >=0.6.104, and an authenticated `gh` on the **bb server's PATH** (a CLI on a different enrolled machine is not used). Linear needs no CLI: create a personal API key and set it as a plugin secret.
 
 ```sh
 npm ci

@@ -1,0 +1,17 @@
+/* The Listening chip and tray use Agent Pills' shared Cursor tray classes
+   (bb-agent-pills__pill, __tray-*), so that plugin should be on; only what
+   it lacks is here. */
+
+.bb-subs__connective {
+  color: var(--muted-foreground);
+}
+
+.bb-agent-pills__tray-description[data-error] {
+  color: var(--destructive, oklch(0.65 0.2 25));
+}
+
+.bb-subs__error {
+  margin: 4px 8px 6px;
+  color: var(--destructive, oklch(0.65 0.2 25));
+  font-size: 12px;
+}
