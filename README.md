@@ -45,7 +45,7 @@ A bb scheduled script plus `bb thread tell` is a valid alternative for a few fix
 
 ## Install
 
-Requires bb >=0.48.1 (for the context-row slot the pill uses) and SDK >=0.6.104. Linear needs no CLI: create a personal API key and set it as a plugin secret.
+Requires bb >=0.49 (for the context-row slot the pill uses) and SDK >=0.6.132. Linear needs no CLI: create a personal API key and set it as a plugin secret.
 
 ```sh
 npm ci
